@@ -108,7 +108,7 @@ A は a·B = a(bG)、B は b·A = b(aG) を計算
 </main></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const mod=(a,m)=>((a%m)+m)%m;
@@ -174,9 +174,12 @@ $('#enc').onclick=async()=>{
  qr($('#msgqr'),'ECC1.MSG.'+b2h(iv)+b2h(ct));log('✉ '+m,'out')};
 
 let st;const v=$('#v'),cv=document.createElement('canvas');
-$('#cam').onclick=async()=>{try{st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
- v.srcObject=st;v.hidden=false;await v.play();tick()}
- catch(e){log('カメラを使えませんでした。画像の読み取りか文字列の貼り付けを使ってください。','err')}};
+$('#cam').onclick=async()=>{
+ if(typeof jsQR==='undefined')return log('QR読み取りライブラリを読み込めませんでした。ネットワークを確認して再読み込みしてください。','err');
+ try{st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  v.srcObject=st;v.hidden=false;await v.play()}
+ catch(e){stop();return log('カメラを使えませんでした（'+(e.name||e)+'）。画像の読み取りか文字列の貼り付けを使ってください。','err')}
+ tick()};
 function stop(){st&&st.getTracks().forEach(t=>t.stop());st=null;v.hidden=true}
 function tick(){if(!st)return;
  if(v.videoWidth){cv.width=v.videoWidth;cv.height=v.videoHeight;const x=cv.getContext('2d');x.drawImage(v,0,0);
