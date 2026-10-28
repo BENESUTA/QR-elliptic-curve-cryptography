@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QRで体験する楕円曲線暗号</title>
+<meta name="description" content="QRコードだけで楕円曲線暗号（ECDH + AES-GCM）の鍵交換と暗号通信を体験でき、高校生向けの数学解説も読めるWebサイト。">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+:root{--bg:#f2f6f5;--fg:#12202b;--mut:#587083;--card:#fff;--line:#cfdcdc;--ac:#0b7a75;--ac2:#b4470f;--acbg:#dff2ef;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1920;--fg:#e4eef2;--mut:#8aa4b3;--card:#15262f;--line:#27404c;--ac:#43d3c6;--ac2:#ff9a5c;--acbg:#12353a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1920;--fg:#e4eef2;--mut:#8aa4b3;--card:#15262f;--line:#27404c;--ac:#43d3c6;--ac2:#ff9a5c;--acbg:#12353a;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.8 "Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif}
+.w{max-width:720px;margin:0 auto;padding:18px 16px 48px}
+h1{font-size:1.5rem;line-height:1.4;margin:.4em 0}
+h2{font-size:1.2rem;margin:1.8em 0 .4em;padding-left:.6em;border-left:4px solid var(--ac)}
+p{margin:.6em 0}.m{color:var(--mut);font-size:.9rem}
+nav{display:flex;gap:8px;margin:14px 0}
+nav button{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;font:inherit;font-weight:700}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.c{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.c h3{margin:0 0 6px;font-size:1.05rem}
+button.b,label.b{display:inline-block;padding:9px 14px;margin:4px 6px 4px 0;border-radius:9px;border:1px solid var(--ac);background:var(--ac);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+button.b.o,label.b.o{background:none;color:var(--ac)}
+textarea,input[type=text]{width:100%;font:13px/1.4 ui-monospace,Menlo,monospace;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);word-break:break-all}
+img{max-width:260px;width:100%;display:block;margin:8px auto;border-radius:6px}
+video{width:100%;max-height:300px;border-radius:8px;background:#000}
+code,pre{font-family:ui-monospace,Menlo,monospace;font-size:.88rem}
+pre{background:var(--acbg);padding:10px 12px;border-radius:8px;overflow-x:auto;line-height:1.6}
+.ms{padding:8px 12px;border-radius:10px;margin:6px 0;word-break:break-all}
+.ms.in{background:var(--acbg)}.ms.out{background:var(--bg);border:1px dashed var(--ac)}.ms.err{color:var(--ac2)}.ms.sys{color:var(--mut);font-size:.88rem}
+.fp{font:700 1.3rem ui-monospace,Menlo,monospace;color:var(--ac);letter-spacing:.1em}
+.sc{overflow-x:auto}canvas,svg{max-width:100%;height:auto;display:block;margin:0 auto}
+input[type=range]{width:100%;accent-color:var(--ac)}
+svg text{fill:var(--fg);font-size:13px}.cv{fill:none;stroke:var(--ac);stroke-width:2.5}.ax{stroke:var(--line);stroke-width:1}.ln{stroke:var(--ac2);stroke-width:1.6}.ds{stroke:var(--mut);stroke-dasharray:4 4}
+.r{display:block;font-size:.88rem;margin:3px 0}select{font:inherit;padding:4px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+[hidden]{display:none!important}
+</style></head><body><div class="w">
+<h1>🔐 QRで体験する楕円曲線暗号</h1>
+<p class="m">QRコードだけをやり取りして、盗み見されても読めない秘密の会話をしてみよう。</p>
+<nav><button class="on" data-t="lab">体験する</button><button data-t="doc">しくみを学ぶ</button></nav>
+
+<main id="lab">
+<div class="c"><p class="m" style="margin-top:0">2台のスマホ（または2つのタブ）でこのページを開き、同じ手順を行います。QRは画面を読み取るか、下の文字列をコピーして渡せます。</p></div>
+<div class="c"><h3>① 自分の鍵を作る</h3>
+<button class="b" id="gen">鍵ペアを作る</button>
+<div id="mykey" hidden><p class="m">この公開鍵QRを相手に読み取ってもらいます。</p><div id="myqr"></div>
+<details><summary class="m">秘密鍵 d（絶対に見せない）</summary><code id="dval" style="word-break:break-all"></code></details></div></div>
+
+<div class="c"><h3>② 受け取る（相手の公開鍵・暗号文）</h3>
+<button class="b" id="cam">📷 カメラで読み取る</button><label class="b o">🖼 画像から読み取る<input id="file" type="file" accept="image/*" hidden></label>
+<video id="v" playsinline muted hidden></video>
+<textarea id="inp" rows="2" placeholder="ECC1.PUB.… または ECC1.MSG.… を貼り付け"></textarea>
+<button class="b o" id="paste">この文字列を処理する</button></div>
+
+<div class="c" id="sec" hidden><h3>③ 共有の秘密ができた</h3>
+<p>確認コード <span class="fp" id="fp"></span></p>
+<p class="m">二人の画面で同じコードになっていれば、通信路は安全です。違えば誰かがすり替えています。</p>
+<details><summary class="m">共有点 S = d × 相手の公開鍵 の x座標</summary><code id="sx" style="word-break:break-all"></code></details>
+<textarea id="msg" rows="2" placeholder="送るメッセージ（日本語なら30文字ほどまで）"></textarea>
+<button class="b" id="enc">暗号化してQRにする</button><div id="msgqr"></div></div>
+
+<div class="c"><h3>やり取りの記録</h3><div id="log"><div class="ms sys">まず①で鍵を作りましょう。</div></div></div>
+</main>
+
+<main id="doc" hidden>
+<h2>鍵をどうやって渡す？</h2>
+<p>暗号は「鍵」で内容を隠します。ところが相手に鍵を渡す道で盗まれたら意味がありません。これを鍵配送問題といいます。</p>
+<p>解決のヒントは<b>ペンキの混色</b>です。二人が共通の黄色を持ち、それぞれ秘密の色（Aは青、Bは赤）を混ぜて交換します。受け取った色に自分の秘密色を足すと、二人とも「黄＋青＋赤」の同じ色になります。盗聴者は混ざった色から元の色を取り出せません。楕円曲線暗号（ECDH）は、この「混ぜる」を<b>点の足し算</b>で行います。</p>
+
+<h2>楕円曲線と点の足し算</h2>
+<p>楕円曲線は <code>y² = x³ + ax + b</code> のグラフで、とがりや自己交差がない（4a³ + 27b² ≠ 0）ものを使います。下の図では a, b や P, Q の位置を動かせます。曲線上の2点 P, Q の「和」は次の作図で決めます。</p>
+<p>① P と Q を通る直線を引き、曲線との3つ目の交点 R を求める。② R をx軸で上下に反転した点が P+Q。P=Q のときは接線を使います。</p>
+<div class="c"><div id="rcc"></div><svg id="rc" viewBox="0 0 360 360" role="img" aria-label="楕円曲線上の点の足し算"></svg><p id="rt" class="m" style="min-height:6em"></p></div>
+<p>作図を式にすると、傾き λ を使って次のようになります。</p>
+<pre>P≠Q のとき  λ = (y₂ − y₁) / (x₂ − x₁)
+P=Q  のとき  λ = (3x₁² + a) / (2y₁)
+x₃ = λ² − x₁ − x₂
+y₃ = λ(x₁ − x₃) − y₁      ← P+Q = (x₃, y₃)</pre>
+
+<h2>「余り」の世界（有限体）に移す</h2>
+<p>実数のままだと小数が延々と続き、コンピュータでは扱いにくく、誤差も出ます。そこで、すべての計算を<b>素数 p で割った余り</b>で行います（時計の計算と同じ）。すると座標はとびとびの整数になり、曲線は点の散らばりになります。</p>
+<p>難所は割り算です。mod p の世界では「÷2」は「2の逆数を掛ける」ことで、逆数は「掛けて1余りになる数」です。p=17 なら 2×9=18≡1 なので、÷2 は ×9 です。</p>
+<p>例：曲線 <code>y² = x³ + 2x + 2 (mod 17)</code>、G=(5,1) を2倍します。</p>
+<pre>λ = (3·5² + 2) / (2·1) = 77/2 ≡ 9 · 9 = 81 ≡ 13  (mod 17)
+x₃ = 13² − 2·5 = 159 ≡ 6
+y₃ = 13·(5 − 6) − 1 = −14 ≡ 3
+→ 2G = (6, 3)</pre>
+
+<h2>G を k 回足す（スカラー倍）</h2>
+<p>G を k 回足した点を kG と書きます。下の図で k を動かすと、点が不思議な順で飛び回ります。素数 p、a、b、始点 G も変えられます（初期設定は p=17, a=2, b=2, G=(5,1)）。</p>
+<div class="c"><div id="tcc"></div><canvas id="tc" width="360" height="360"></canvas><p id="ts" style="min-height:8em;margin-bottom:0"></p></div>
+<p>足し続けると、いつか「無限遠点 O」（足し算での 0）に戻って一周します。その回数を G の<b>位数</b>といい（初期設定では19）、位数 n なら nG = O で、(n−1)G は G の上下を反転した −G になります。O は座標をもたないので図には点が出ません。点の並びに規則性は見えず、kG から k を逆算するのは困難です。</p>
+<p>実際の暗号では k が2²⁵⁶ほどもあります。ただし順番に足す必要はなく、<b>倍々</b>にして必要な分だけ足せば速く計算できます（ダブル＆アド）。例：13 = 8+4+1 なので 13G = 8G + 4G + G。256ビットでも約256回の倍加と加算で済みます。</p>
+<p>逆に、G と kG から k を求める問題を<b>楕円曲線の離散対数問題</b>といい、今の計算機では現実的な時間で解けません。ここが安全性の根拠です。</p>
+
+<h2>鍵交換（ECDH）のしくみ</h2>
+<pre>A：秘密 a → 公開 A = aG        B：秘密 b → 公開 B = bG
+A と B を交換（QRで渡す）
+A は a·B = a(bG)、B は b·A = b(aG) を計算
+どちらも (ab)G で同じ点！</pre>
+<p>ペンキの例えで言えば、黄色が G、混ぜる回数が秘密鍵です。盗聴者は G, aG, bG を知っても abG を作れません。</p>
+
+<h2>このサイトの中身</h2>
+<p>曲線は <code>secp256k1</code>（y² = x³ + 7、p = 2²⁵⁶ − 2³² − 977）です。乱数の秘密鍵 d から Q = dG を作り、33バイトに圧縮してQRにします。共有点 S の x座標を SHA-256 で混ぜて AES-256-GCM の鍵にし、メッセージを暗号化・改ざん検知します。QRの文字列は大文字の英数字だけにして、小さなQRで済むようにしています。</p>
+<p class="m">注意：学習用の実装です（計算時間が一定でないなど）。実際のサービスでは検証済みのライブラリを使い、確認コードの照合で相手の本人確認をします。</p>
+</main></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const mod=(a,m)=>((a%m)+m)%m;
+const pw=(b,e,m)=>{let r=1n;b=mod(b,m);while(e>0n){if(e&1n)r=r*b%m;b=b*b%m;e>>=1n}return r};
+const inv=(a,m)=>pw(a,m-2n,m);
+function add(A,B,p,a){if(!A)return B;if(!B)return A;const[x1,y1]=A,[x2,y2]=B;let l;
+ if(x1===x2){if(mod(y1+y2,p)===0n)return null;l=mod((3n*x1*x1+a)*inv(2n*y1,p),p)}
+ else l=mod((y2-y1)*inv(x2-x1,p),p);
+ const x3=mod(l*l-x1-x2,p);return[x3,mod(l*(x1-x3)-y1,p),l]}
+function mul(k,Pt,p,a){let R=null;while(k>0n){if(k&1n)R=add(R,Pt,p,a);Pt=add(Pt,Pt,p,a);k>>=1n}return R}
+const P=(1n<<256n)-(1n<<32n)-977n,N=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+const G0=[0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n,0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n];
+const hx=(n,l=64)=>n.toString(16).padStart(l,'0');
+const b2h=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+const h2b=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
+const sha=async b=>new Uint8Array(await crypto.subtle.digest('SHA-256',b));
+let d,peer,key;
+
+function log(t,c){const e=document.createElement('div');e.className='ms '+(c||'sys');e.textContent=t;$('#log').prepend(e)}
+function qr(el,s){s=s.toUpperCase();const q=qrcode(0,'L');q.addData(s,'Alphanumeric');q.make();
+ el.innerHTML='';const i=new Image();i.src=q.createDataURL(6,4);i.alt='QRコード';el.append(i);
+ const t=document.createElement('textarea');t.readOnly=true;t.rows=3;t.value=s;t.onclick=()=>t.select();el.append(t)}
+
+$('#gen').onclick=async()=>{
+ d=BigInt('0x'+b2h(crypto.getRandomValues(new Uint8Array(32))))%(N-1n)+1n;
+ const Q=mul(d,G0,P,0n);
+ qr($('#myqr'),'ECC1.PUB.'+(Q[1]&1n?'03':'02')+hx(Q[0]));
+ $('#dval').textContent=hx(d);$('#mykey').hidden=false;
+ log('鍵ペアを作りました。公開鍵QRを相手に見せてください。');derive()};
+
+async function derive(){
+ if(!d||!peer)return;
+ const S=mul(d,peer,P,0n),k=await sha(h2b(hx(S[0])));
+ key=await crypto.subtle.importKey('raw',k,'AES-GCM',false,['encrypt','decrypt']);
+ $('#fp').textContent=b2h((await sha(k)).slice(0,4)).toUpperCase();
+ $('#sx').textContent=hx(S[0]);$('#sec').hidden=false;
+ log('共有の秘密ができました。確認コードを相手と見比べてください。')}
+
+async function handle(s){
+ s=String(s).trim().toUpperCase();
+ try{
+  if(s.startsWith('ECC1.PUB.')){
+   const h=s.slice(9);if(!/^0[23][0-9A-F]{64}$/.test(h))throw 0;
+   const x=BigInt('0x'+h.slice(2)),y2=mod(x**3n+7n,P);let y=pw(y2,(P+1n)/4n,P);
+   if(y*y%P!==y2)throw 0;if((y&1n)!==(h[1]==='3'?1n:0n))y=P-y;
+   peer=[x,y];log('相手の公開鍵を受け取りました。');
+   if(!d)log('先に①で自分の鍵を作ってください。','err');await derive();
+  }else if(s.startsWith('ECC1.MSG.')){
+   if(!key)return log('先に相手の公開鍵を読み取ってください。','err');
+   const h=s.slice(9);if(!/^([0-9A-F]{2}){29,}$/.test(h))throw 0;
+   const b=h2b(h);
+   try{const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));
+    log('📩 '+new TextDecoder().decode(pt),'in')}
+   catch(e){log('復号できませんでした。鍵が違うか、改ざんされています。','err')}
+  }else throw 0
+ }catch(e){if(e===0)log('このQRはこのサイトの形式ではありません。','err');else throw e}}
+
+$('#enc').onclick=async()=>{
+ const m=$('#msg').value,t=new TextEncoder().encode(m);
+ if(!t.length)return;if(t.length>100)return log('メッセージが長すぎます（100バイトまで）。','err');
+ const iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,t));
+ qr($('#msgqr'),'ECC1.MSG.'+b2h(iv)+b2h(ct));log('✉ '+m,'out')};
+
+let st;const v=$('#v'),cv=document.createElement('canvas');
+$('#cam').onclick=async()=>{try{st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+ v.srcObject=st;v.hidden=false;await v.play();tick()}
+ catch(e){log('カメラを使えませんでした。画像の読み取りか文字列の貼り付けを使ってください。','err')}};
+function stop(){st&&st.getTracks().forEach(t=>t.stop());st=null;v.hidden=true}
+function tick(){if(!st)return;
+ if(v.videoWidth){cv.width=v.videoWidth;cv.height=v.videoHeight;const x=cv.getContext('2d');x.drawImage(v,0,0);
+  const im=x.getImageData(0,0,cv.width,cv.height),r=jsQR(im.data,im.width,im.height);
+  if(r&&r.data){stop();handle(r.data);return}}
+ requestAnimationFrame(tick)}
+$('#file').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+ const b=await createImageBitmap(f);cv.width=b.width;cv.height=b.height;const x=cv.getContext('2d');x.drawImage(b,0,0);
+ const im=x.getImageData(0,0,b.width,b.height),r=jsQR(im.data,b.width,b.height);
+ r?handle(r.data):log('QRを見つけられませんでした。','err');e.target.value=''};
+$('#paste').onclick=()=>{handle($('#inp').value);$('#inp').value=''};
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+ $('#lab').hidden=b.dataset.t!=='lab';$('#doc').hidden=b.dataset.t!=='doc';scrollTo(0,0);if(b.dataset.t==='doc')toyDraw()});
+
+// 教材：有限体上の曲線（p, a, b, G を変更可能）
+const PR=[11,13,17,19,23,29,31,37,41,43,47,53];
+let TPb=17n,TAb=2n,pts=[],M=null,nn=0,GC=null,tp_=17;
+const lab=(id,t,min,max,step,val)=>`<label class="r">${t} = <b id="${id}v">${val}</b><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></label>`;
+function toyInit(){
+ $('#tcc').innerHTML=`<label class="r">素数 p <select id="tp">${PR.map(q=>`<option${q==17?' selected':''}>${q}</option>`).join('')}</select></label>`+lab('ta','a',0,16,1,2)+lab('tb','b',0,16,1,2)+`<label class="r">始点 G <select id="tg"></select></label>`+lab('k','k',1,19,1,1);
+ $('#tcc').oninput=e=>{const id=e.target.id;if(id==='tp'||id==='ta'||id==='tb')toyCalc();else if(id==='tg')setG();toyDraw()};
+ toyCalc();toyDraw()}
+const ord=q=>{const g=[BigInt(q[0]),BigInt(q[1])];let r=g,n=1;while(r&&n<300){r=add(r,g,TPb,TAb);n++}return n};
+function toyCalc(){
+ const p=+$('#tp').value,ta=$('#ta'),tb=$('#tb');ta.max=tb.max=p-1;
+ if(+ta.value>p-1)ta.value=p-1;if(+tb.value>p-1)tb.value=p-1;
+ const a=+ta.value,b=+tb.value;$('#tav').textContent=a;$('#tbv').textContent=b;
+ tp_=p;TPb=BigInt(p);TAb=BigInt(a);pts=[];M=null;
+ for(let x=0;x<p;x++)for(let y=0;y<p;y++)if(mod(y*y-x**3-a*x-b,p)===0)pts.push([x,y]);
+ const sel=$('#tg');
+ if(mod(4*a**3+27*b*b,p)===0||!pts.length){sel.innerHTML='';return}
+ const pv=GC||[5,1];let pi=pts.findIndex(q=>q[0]==pv[0]&&q[1]==pv[1]);if(pi<0)pi=0;
+ sel.innerHTML=pts.map((q,i)=>`<option value="${i}"${i==pi?' selected':''}>(${q[0]}, ${q[1]})　位数${ord(q)}</option>`).join('');
+ setG()}
+function setG(){
+ const g=pts[+$('#tg').value];GC=g;const G=[BigInt(g[0]),BigInt(g[1])];M=[null,G];
+ for(let i=2;;i++){M[i]=add(M[i-1],G,TPb,TAb);if(!M[i]){nn=i;break}}
+ const k=$('#k');k.max=nn;if(+k.value>nn)k.value=nn}
+function toyDraw(){
+ const c=$('#tc'),x=c.getContext('2d'),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n),p=tp_;
+ const s=320/(p-1),X=v=>20+v*s,Y=v=>340-v*s,k=+$('#k').value;
+ $('#kv').textContent=k;x.clearRect(0,0,360,360);
+ x.strokeStyle=css('--line');x.fillStyle=css('--mut');x.font='10px sans-serif';
+ const st=p>30?10:p>16?5:4;
+ for(let i=0;i<p;i++){if(p<=31){x.beginPath();x.moveTo(X(i),10);x.lineTo(X(i),350);x.moveTo(10,Y(i));x.lineTo(350,Y(i));x.stroke()}
+  if(i%st==0){x.fillText(i,X(i)-3,358);x.fillText(i,1,Y(i)+3)}}
+ const T=$('#ts'),eq=`y² = x³ + ${$('#tav').textContent}x + ${$('#tbv').textContent}  (mod ${p})`;T.style.whiteSpace='pre-line';
+ if(!M){T.textContent=eq+'\nこの a, b では曲線になりません（4a³+27b² ≡ 0 mod p）。a か b を変えてください。';return}
+ const r=Math.max(2,Math.min(5,s/3.2));
+ x.globalAlpha=.45;pts.forEach(q=>{x.beginPath();x.arc(X(q[0]),Y(q[1]),r*.8,0,7);x.fill()});
+ for(let i=1;i<nn;i++){const q=M[i];x.beginPath();x.arc(X(Number(q[0])),Y(Number(q[1])),r*(i<=k?1.2:.9),0,7);x.fillStyle=i<=k?css('--ac'):css('--mut');x.globalAlpha=i<=k?.7:.5;x.fill()}
+ x.globalAlpha=1;
+ if(k<nn){const q=M[k];x.beginPath();x.arc(X(Number(q[0])),Y(Number(q[1])),r*1.9,0,7);x.fillStyle=css('--ac2');x.fill();x.fillStyle=css('--fg');x.font='bold 12px sans-serif';x.fillText(k+'G',X(Number(q[0]))+11,Y(Number(q[1]))-8)}
+ else{x.fillStyle=css('--ac2');x.font='bold 13px sans-serif';x.fillText(`${k}G = O（無限遠点：点は存在しない）`,24,24)}
+ const g=M[1];let t;
+ if(k===1)t='1G = G';
+ else if(k===nn){const o=M[k-1];t=`${k-1}G = (${o[0]}, ${o[1]}) と G = (${g[0]}, ${g[1]}) を通る直線は縦になり、3つ目の交点がない。→ ${k}G = O。ここで一周！`}
+ else{const o=M[k-1],q=M[k];t=`${k}G = ${k-1}G + G = (${o[0]}, ${o[1]}) + (${g[0]}, ${g[1]})\nλ = ${q[2]} → (${q[0]}, ${q[1]})`+(k===2?'（同じ点なので接線）':'')}
+ T.textContent=`${eq}\nG = (${g[0]}, ${g[1]})　位数 ${nn}\n`+t}
+
+// 教材：実数上の足し算の作図（a, b, P, Q を変更可能）
+function realInit(){
+ $('#rcc').innerHTML=lab('ra','a',-5,3,.5,-3)+lab('rb','b',-3,8,.5,5)+lab('rpx','P の x',-4,5,.1,-1.5)+lab('rqx','Q の x',-4,5,.1,1)+
+ `<label><input type="checkbox" id="rpu" checked> P は y&gt;0 側</label>　<label><input type="checkbox" id="rqu"> Q は y&gt;0 側</label>`;
+ $('#rcc').oninput=realDraw;realDraw()}
+function realDraw(){
+ const v=id=>+$('#'+id).value,a=v('ra'),b=v('rb'),f=x=>x**3+a*x+b;
+ const snap=x=>{for(let i=0;i<=90;i++)for(const q of[1,-1]){const t=Math.round((x+q*i/10)*10)/10;if(t>=-4&&t<=5&&f(t)>=0)return t}return null};
+ const x1=snap(v('rpx')),x2=snap(v('rqx'));
+ if(x1!=null)$('#rpx').value=x1;if(x2!=null)$('#rqx').value=x2;
+ ['ra','rb','rpx','rqx'].forEach(id=>$('#'+id+'v').textContent=$('#'+id).value);
+ const sx=x=>(x+4)*40,sy=y=>180-y*20,N=n=>n.toFixed(2),sg=n=>n<0?'−':'+';
+ const eq=`y² = x³ ${sg(a)} ${Math.abs(a)}x ${sg(b)} ${Math.abs(b)}`,disc=4*a**3+27*b*b;
+ const rt=(u,w)=>{const s=f(u)>=0;let lo=u,hi=w;for(let i=0;i<40;i++){const m=(lo+hi)/2;(f(m)>=0)===s?lo=m:hi=m}return(lo+hi)/2};
+ let path='',seg=null;
+ const fl=er=>{const h=x=>Math.sqrt(Math.max(f(x),0)),U=seg.map(x=>sx(x)+' '+sy(h(x))),D=seg.map(x=>sx(x)+' '+sy(-h(x))).reverse();path+='M'+U.join('L')+(er?'L':'M')+D.join('L');seg=null};
+ let prev=f(-4)>=0;if(prev)seg=[-4];
+ for(let i=1;i<=900;i++){const x=-4+i*.01,ok=f(x)>=0;
+  if(ok&&!prev)seg=[rt(x-.01,x),x];else if(ok&&prev)seg.push(x);else if(!ok&&prev){seg.push(rt(x-.01,x));fl(true)}prev=ok}
+ if(seg)fl(false);
+ let info=eq,pic='';
+ if(Math.abs(disc)<1e-9)info=eq+'\n4a³+27b² = 0 なので、とがった点か自己交差ができ、楕円曲線になりません。a か b を変えてください。';
+ else if(x1==null||x2==null)info=eq+'\nこの範囲に曲線上の点がありません。';
+ else{
+  const y1=(v('rpu')?1:-1)*Math.sqrt(f(x1)),y2=(v('rqu')?1:-1)*Math.sqrt(f(x2));
+  const same=Math.abs(x1-x2)<1e-9&&Math.abs(y1-y2)<1e-9,vert=Math.abs(x1-x2)<1e-9&&(!same||Math.abs(y1)<1e-9);
+  const pt=(x,y,n,dx,dy)=>Math.abs(y)<=9&&x>=-4&&x<=5?`<circle cx="${sx(x)}" cy="${sy(y)}" r="5" fill="var(--ac2)"/><text x="${sx(x)+dx}" y="${sy(y)+dy}">${n}</text>`:'';
+  const head=`${eq}\nP = (${N(x1)}, ${N(y1)})、Q = (${N(x2)}, ${N(y2)})`;
+  if(vert){pic=`<line class="ln" x1="${sx(x1)}" y1="0" x2="${sx(x1)}" y2="360"/>`+pt(x1,y1,'P',8,-6)+(same?'':pt(x2,y2,'Q',8,16));
+   info=head+'\n直線がまっすぐ縦になり、3つ目の交点がありません。P+Q = O（無限遠点）'}
+  else{const l=same?(3*x1*x1+a)/(2*y1):(y2-y1)/(x2-x1),x3=l*l-x1-x2,y3=y1+l*(x3-x1);
+   pic=`<line class="ln" x1="${sx(-4)}" y1="${sy(y1+l*(-4-x1))}" x2="${sx(5)}" y2="${sy(y1+l*(5-x1))}"/><line class="ds" x1="${sx(x3)}" y1="${sy(y3)}" x2="${sx(x3)}" y2="${sy(-y3)}"/>`+pt(x1,y1,same?'P = Q':'P',-4,-10)+(same?'':pt(x2,y2,'Q',8,16))+pt(x3,y3,'R',8,16)+pt(x3,-y3,'P+Q',8,4);
+   info=head+(same?'（同じ点なので接線）':'')+`\nλ = ${N(l)}　R = (${N(x3)}, ${N(y3)})\nP+Q = (${N(x3)}, ${N(-y3)})`}
+ }
+ $('#rc').innerHTML=`<line class="ax" x1="0" y1="180" x2="360" y2="180"/><line class="ax" x1="${sx(0)}" y1="0" x2="${sx(0)}" y2="360"/><path class="cv" d="${path}"/>`+pic;
+ $('#rt').textContent=info;$('#rt').style.whiteSpace='pre-line'}
+toyInit();realInit();
+</script></body></html>
